@@ -40,7 +40,7 @@ def slavePodTemplate = """
         podTemplate(name: k8slabel, label: k8slabel, yaml: slavePodTemplate, showRawYaml: false) {
             node(k8slabel) {
             stage('Pull SCM') {
-                checkout SCM
+                checkout scm
             }
             container('docker'){
         dir('deployments/docker') {
