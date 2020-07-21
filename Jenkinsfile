@@ -45,7 +45,7 @@ def slavePodTemplate = """
             container('docker'){
         dir('deployments/docker') {
         stage("Docker Build") {
-        sh "docker build -t fsadykov/artemis:${branch.replace('version/', 'v')}  ."
+        sh "docker build -t taavusb/artemis:${branch.replace('version/', 'v')}  ."
 
         }
         stage("Docker Login") {
@@ -56,7 +56,7 @@ def slavePodTemplate = """
         }
         stage("Docker Push") {
 
-        sh "docker push fsadykov/artemis:${branch.replace('version/', 'v')}"
+        sh "docker push taavusb/artemis:${branch.replace('version/', 'v')}"
         }
 
         stage("Trigger Deploy"){
