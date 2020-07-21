@@ -61,7 +61,7 @@ def slavePodTemplate = """
 
         stage("Trigger Deploy"){
 
-            build 'artemis-deploy'
+            build 'artemis-build'
         }
 
 
