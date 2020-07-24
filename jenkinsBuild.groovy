@@ -1,4 +1,5 @@
 def k8slabel = "jenkins-pipeline-${UUID.randomUUID().toString()}"
+
 def slavePodTemplate = """
       metadata:
         labels:
@@ -35,43 +36,58 @@ def slavePodTemplate = """
             hostPath:
               path: /var/run/docker.sock
     """
-    def branch          = "${scm.branches[0].name}".replaceAll(/^\*\//, '').replace("/", "-").toLowerCase()
-    
-        podTemplate(name: k8slabel, label: k8slabel, yaml: slavePodTemplate, showRawYaml: false) {
-            node(k8slabel) {
-            stage('Pull SCM') {
-                checkout scm
-            }
-            container('docker'){
-        dir('deployments/docker') {
-        stage("Docker Build") {
-        sh "docker build -t taavusb/artemis:${branch.replace('version/', 'v')}  ."
+   //specify the environmet DYNAMICLY and print 
+    def environment  = ""
+    def docker_image = ""
+    def branch = "${scm.branches[0].name}".replaceAll(/^\*\//, '').replace("/", "-").toLowerCase()
 
+    docker_image = "taavusb/artemis:${branch.replace('version/', 'v')}"
+
+    // master -> prod  dev-feature/* -> dev qa-feature/* -> qa 
+    if (branch == "master") {
+      environment = "prod"
+    } else if (branch.contains('dev-feature')) {
+      environment = "dev"
+    } else if (branch.contains('qa-feature')) {
+      environment = "qa"
+    }
+    println("${environment}")
+
+
+   
+   
+    podTemplate(name: k8slabel, label: k8slabel, yaml: slavePodTemplate, showRawYaml: false) {
+      node(k8slabel) {
+
+        stage('Pull SCM') {
+            checkout scm 
         }
-        stage("Docker Login") {
-        withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', passwordVariable: 'password', usernameVariable: 'username')]) {
-        sh "docker login --username ${username} --password ${password}"
 
-        }
-        }
-        stage("Docker Push") {
+        container("docker") {
+            dir('deployments/docker') {
+                stage("Docker Build") {
+                  sh "docker build -t ${docker_image}  ."
+                }
 
-        sh "docker push taavusb/artemis:${branch.replace('version/', 'v')}"
-        }
+                stage("Docker Login") {
+                    withCredentials([usernamePassword(credentialsId: 'docker credentials', passwordVariable: 'password', usernameVariable: 'username')]) {
+                      sh "docker login --username ${username} --password ${password}"
+                    }
+                }
 
-        stage("Trigger Deploy"){
+                stage("Docker Push") {
+                  sh "docker push ${docker_image}"
+                }
 
-            build 'artemis-build'
-            parameters: [
-                      [$class: 'BooleanParameterValue', name: 'terraformApply',     value: true],
-                      [$class: 'StringParameterValue',  name: 'environment',         value: "dev"]
+                stage("Trigger Deploy") {
+                  build job: 'artemis-deploy', 
+                  parameters: [
+                      [$class: 'BooleanParameterValue', name: 'terraformApply', value: true],
+                      [$class: 'StringParameterValue',  name: 'environment', value: "${environment}"],
+                      [$class: 'StringParameterValue',  name: 'docker_image', value: "${docker_image}"]
                       ]
-        }
-
-
-            }
-            }
-
-            
+                }
             }
         }
+      }
+    }
